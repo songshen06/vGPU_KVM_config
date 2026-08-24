@@ -126,14 +126,49 @@ Phase 0 ─── 一次性主机准备 (BIOS → display mode → OS → driver
    └── Phase E ─── 全拆清理
 ```
 
-## 前提条件 Prerequisites
+---
 
-- **GPU**: Ampere+ (SR-IOV) 或 Pascal+ (legacy mdev)；MIG 功能需 Blackwell (RTX PRO 6000/5000/4500)
-- **Hypervisor**: Red Hat / Ubuntu KVM，libvirt 已安装
-- **Agent 侧**: 能免密 SSH 到 KVM 主机 (`ssh root@<host>`)
-- **BIOS**: SR-IOV、VT-d、ARI (AMD)、Above 4G 均已开启
-- **vGPU 软件包**: NVIDIA vGPU Manager `.run` 包已下载到主机
-- **License 部署**: NVIDIA Licensing Portal 账号 + 有效的 license 授权
+## ⚠️ 前置条件 Prerequisites — 使用前必读
+
+### 🔴 硬性前提 Must Have
+
+> 这些缺一不可。没有的话 Agent 无法工作。
+
+| # | 条件 | 适用 Skill | 说明 |
+|---|---|---|---|
+| 1 | **SSH 免密登录** | 两个都需要 | Agent 通过 `ssh root@<kvm-host>` 执行所有命令。你的 Agent 运行环境必须能免密 SSH 到目标 KVM 主机 |
+| 2 | **NVIDIA 企业账号** | 两个都需要 | 用于下载 vGPU 软件包 + 登录 NVIDIA Licensing Portal。通过 `nvid.nvidia.com` 访问 |
+| 3 | **有效的 License Entitlements** | license-system-deploy | Portal 里必须有已购买的 vGPU license 授权（如 NVIDIA RTX vWS、GRID Virtual PC 等） |
+| 4 | **NVIDIA GPU 硬件** | vgpu-kvm-config | Ampere+ (SR-IOV) 或 Pascal+ (legacy mdev)；MIG 功能需 Blackwell (RTX PRO 6000/5000/4500) |
+| 5 | **KVM Hypervisor** | vgpu-kvm-config | Red Hat 或 Ubuntu，libvirt 已安装、libvirtd 已运行 |
+| 6 | **BIOS 虚拟化支持** | vgpu-kvm-config | SR-IOV、VT-d/AMD-Vi、ARI (AMD)、Above 4G Decoding 均已开启 |
+| 7 | **vGPU Manager 软件包** | vgpu-kvm-config | `NVIDIA-Linux-x86_64-<ver>-vgpu-kvm.run` 已从 NVIDIA 下载到 KVM 主机 |
+| 8 | **DLS 镜像文件** | license-system-deploy | QCOW2 虚拟机镜像（KVM 部署）或 tar.gz 容器镜像（Docker/K8s 部署） |
+| 9 | **网络连通性** | license-system-deploy | DLS 能 HTTPS 出站到 `nvid.nvidia.com`；客户端能 HTTPS 访问 DLS 的 443 端口 |
+
+### 🟡 你需要会做的 What You Need to Know
+
+> Agent 会给你精确到按钮名称的操作指南（`references/human-operations-guide.md`）。
+
+| 操作 | 耗时 | 说明 |
+|---|---|---|
+| **提供 SSH 凭据** | 1 分钟 | 告诉 Agent："KVM 主机 IP 是 10.0.0.5，root 密码是 xxx" 或配置好 SSH key |
+| **Portal 上建 License Server** | 5 分钟 | 打开 `nvid.nvidia.com` → 跟着手册 Section 1 一步步点击 |
+| **Portal 上拿 API Key** | 2 分钟 | 跟着手册 Section 2，点击 5 下，复制一串 key 给 Agent |
+| **注册 DLS Admin** | 3 分钟 | Agent 部署完 DLS VM 后，打开 `https://<dls-ip>` 填邮箱+密码 |
+| **生成 Client Token** | 2 分钟 | DLS Web UI 上点击 Generate → 下载 `.tok` 文件给 Agent |
+| **回答选择题** | 1 分钟 | "要几个 VM？密度优先还是隔离优先？哪种 license？" |
+
+### 🟢 你不需要会的 What You DON'T Need
+
+> Agent 全权负责以下所有命令行操作，你无需了解：
+
+- ❌ KVM/virsh/virt-install 命令
+- ❌ nvidia-smi / mdevctl / SR-IOV / MIG 配置
+- ❌ Docker / Kubernetes / Podman 部署
+- ❌ dls_registration / dls_configuration 自动化工具
+- ❌ License 排障 / 日志收集 / 健康检查
+- ❌ Linux 网络配置 (nmcli)、systemctl、scp
 
 ---
 
