@@ -6,6 +6,69 @@
 
 ---
 
+## 🗺️ 总流程 End-to-End Flow
+
+从零开始到 GPU 虚拟机拿到 License 授权的完整路径。标注每一步由哪个 skill 负责、谁来执行。
+
+```
+🧑 前置准备
+  │
+  ├─ 提供 SSH 凭据 (KVM 主机 IP + root 密码/SSH key)         🧑 Human
+  ├─ 下载 vGPU Manager .run 包 + DLS QCOW2 镜像               🧑 Human
+  ├─ 登录 nvid.nvidia.com → 建 License Server → 记下 ID       🧑 Human
+  └─ Portal → My Info → 生成 DlsInstallAutomation API Key      🧑 Human
+         │
+         ▼
+┌─────────────────────── vgpu-kvm-config ─────────────────────┐
+│                                                              │
+│  Phase 0: 主机准备                                           │
+│    ├─ BIOS 验证 (SR-IOV, VT-d, Above 4G)         🤖 Agent   │
+│    ├─ 安装 vGPU Manager .run                      🤖 Agent   │
+│    └─ 启用 SR-IOV VFs                             🤖 Agent   │
+│                                                              │
+│  Phase A/B/C/D: 创建 vGPU                                   │
+│    ├─ Quick Decision → 选模式 (时分/MIG/混合)     🤖 Agent   │
+│    ├─ mdevctl / nvidia-smi 创建 vGPU              🤖 Agent   │
+│    ├─ virt-install 创建 VM + virsh 挂载 vGPU      🤖 Agent   │
+│    └─ VM 内安装 NVIDIA GRID 驱动                  🤖 Agent   │
+│                                                              │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼  VM 已有 GPU，但没有 License
+                               │
+┌──────────────────── license-system-deploy ───────────────────┐
+│                                                              │
+│  Phase B/C: 部署 DLS License 服务器                          │
+│    ├─ check_dls_prereqs.sh 环境预检               🤖 Agent   │
+│    ├─ virt-install 创建 DLS VM (4 vCPU, 8GB)      🤖 Agent   │
+│    └─ 获取 IP，等待 15min 初始化                   🤖 Agent   │
+│                                                              │
+│  🧑 Human 介入 (参照 human-operations-guide.md)              │
+│    ├─ 打开 https://<dls-ip> → 注册 dls_admin       🧑 Human  │
+│    └─ 把 dls_admin 密码交给 Agent                            │
+│                                                              │
+│  Phase B.6: dls_registration 自动化                          │
+│    ├─ SSH dls_admin@<dls-ip>                       🤖 Agent   │
+│    └─ 运行 dls_registration (注册+绑定+安装License) 🤖 Agent  │
+│                                                              │
+│  🧑 Human 介入                                               │
+│    └─ DLS Web UI → Generate Client Token → .tok     🧑 Human  │
+│                                                              │
+│  Phase E: 客户端授权                                         │
+│    ├─ scp .tok → 所有 VM (ClientConfigToken 目录)   🤖 Agent  │
+│    ├─ systemctl restart nvidia-gridd               🤖 Agent   │
+│    └─ nvidia-smi -q | grep License → Licensed ✅   🤖 Agent   │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+                      ✅ 所有 vGPU VM 已授权
+```
+
+**关键路径：** 🧑 人做 6 次操作（每次 ≤5 分钟，有分步手册） → 🤖 Agent 执行所有 CLI。总耗时约 30-60 分钟（含 DLS 初始化 15 分钟等待）。
+
+---
+
 ## Skills
 
 | Skill | 用途 Purpose | 文件 File |
