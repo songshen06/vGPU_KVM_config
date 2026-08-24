@@ -1,28 +1,27 @@
-# vGPU KVM Config Skill · 使用指南
+# vGPU KVM Config · Agent Skills
 
-> 一份给 AI Agent 用的 NVIDIA vGPU KVM 配置手册。把 BIOS → 驱动 → SR-IOV → MIG → vGPU 完整链路压缩为可分步执行的指令集。Agent 按 Phase 顺序走，用户只需提供 KVM 主机地址和目标场景。
+> NVIDIA vGPU 部署的 AI Agent 技能包。两个独立 skill，覆盖从 GPU 虚拟化到 License 服务的完整链路。
 
-> A consumable instruction set for AI agents to configure NVIDIA vGPU on Linux KVM. Compresses the full BIOS → Driver → SR-IOV → MIG → vGPU pipeline into phased, executable steps. The agent walks through phases; you just give it your KVM host address and goal.
-
----
-
-## 这是什么？ What is this?
-
-`vgpu-kvm-config` 是一个 **Agent Skill** — 它不是给人逐行阅读的手册，而是给 Claude/OpenCode 等 AI Agent 吃的结构化知识包。Agent 加载后能：
-
-- 远程 SSH 到你的 KVM 主机执行配置命令
-- 根据你的需求（密度优先 / 隔离优先 / 混合）自动选择正确的配置路径
-- 查阅 GPU 型号对应的 vGPU 类型表，告诉你最多能开几个虚拟机
-
-`vgpu-kvm-config` is an **Agent Skill** — not a manual for humans to read line by line, but a structured knowledge package consumed by AI agents (Claude, OpenCode, etc.). Once loaded, the agent can:
-
-- SSH into your KVM host and run configuration commands remotely
-- Pick the correct configuration path based on your goal (density / isolation / hybrid)
-- Look up vGPU type tables for your GPU model and tell you max VM count
+> Agent skill bundle for NVIDIA vGPU deployment on Linux KVM. Two independent skills covering the full pipeline from GPU virtualization to license serving.
 
 ---
 
-## 能做什么？ Capabilities
+## Skills
+
+| Skill | 用途 Purpose | 文件 File |
+|---|---|---|
+| **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config.skill` |
+| **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy.skill` |
+
+两者互补：`vgpu-kvm-config` 把 GPU 切成 vGPU 分给 VM，`license-system-deploy` 部署 License 服务器让 VM 里的 GPU 驱动能拿到授权。
+
+These two skills complement each other: `vgpu-kvm-config` partitions GPUs into vGPUs and assigns them to VMs; `license-system-deploy` sets up the license server so the GPU drivers inside VMs can obtain licenses.
+
+---
+
+## vgpu-kvm-config
+
+### 能做什么？ Capabilities
 
 | 场景 Scenario | 你只需说 You just say | Agent 会走 Phase |
 |---|---|---|
@@ -35,30 +34,15 @@
 | 排障 | "vGPU 创建失败、授权不对、MIG 丢失..." | 查 troubleshooting |
 | 全拆清理 | "把 GPU 恢复成普通单卡模式，删掉所有 vGPU" | E |
 
----
-
-## 怎么触发？ How to trigger
-
-把这个 `.skill` 文件放到 Agent 的 skills 目录，然后对话中提及以下任意关键词即可触发：
-
-Place the `.skill` file in your agent's skills directory, then mention any of these keywords in conversation:
+### 触发关键词 Trigger keywords
 
 > vGPU KVM 配置 / vGPU setup / MIG vGPU / 配 vGPU / RTX PRO 6000 vGPU / Blackwell vGPU / nvidia-smi vgpu / SR-IOV vGPU / time-sliced vGPU / MIG-backed vGPU / guest CI split / configure vGPU on KVM / vGPU environment check
 
-你也可以直接说：
-
-Or just say:
-
-> "用 vgpu-kvm-config skill 帮我在 10.0.0.5 上配 4 个 MIG 隔离 vGPU"
-> "Use the vgpu-kvm-config skill to set up 4 MIG-isolated vGPUs on 10.0.0.5"
-
----
-
-## 文件结构 File structure
+### 文件结构 File structure
 
 ```
-vgpu-kvm-config.skill          ← 打包的 skill 文件 (zip)
-├── SKILL.md                   ← 主流程：Phase 0 Quick Decision → A B C
+vgpu-kvm-config.skill
+├── SKILL.md                   ← 主流程：Phase 0/Quick Decision → A B C D E
 ├── scripts/
 │   └── vgpu_env_check.sh      ← 一键环境体检脚本
 └── references/
@@ -70,23 +54,77 @@ vgpu-kvm-config.skill          ← 打包的 skill 文件 (zip)
 
 ---
 
-## Phase 路线图 Phase roadmap
+## license-system-deploy
+
+### 能做什么？ Capabilities
+
+| 场景 Scenario | 你只需说 You just say | Agent 会走 Phase |
+|---|---|---|
+| 部署 DLS VM | "帮我在 KVM 主机上部署 DLS license 服务器" | 环境预检 → B |
+| 部署 DLS 容器 | "用 Docker 部署 DLS license 服务器" | C |
+| DLS 自动化注册 | "用 dls_registration 工具注册 DLS、绑定、安装 license" | B.6 |
+| 客户端批量授权 | "把 token 分发到所有 GPU VM，重启 grid 服务" | E |
+| License 排障 | "VM 里 nvidia-smi 显示 Unlicensed" | troubleshooting |
+| HA 集群扩容 | "把 DLS 集群从 2 节点扩到 3 节点" | D.2 |
+| License 服务体检 | "检查 DLS 健康状态" | Monitoring |
+
+### Human + Agent 协作模式
+
+这个 skill 明确区分了 portal/Web UI（人操作）和 CLI（Agent 操作）：
+
+```
+Human(Portal 建 License Server + 拿 API Key)
+   ↓
+Agent(SSH → virt-install 部署 DLS VM → 运行 dls_registration)
+   ↓
+Human(打开 https://<dls-ip> 注册 admin → 生成 client token)
+   ↓
+Agent(scp token → 所有 VM → 重启 nvidia-gridd → 验证)
+```
+
+Human 操作指南（每个按钮、字段、下拉选项精确标注）在 `references/human-operations-guide.md`。
+
+### 触发关键词 Trigger keywords
+
+> DLS 部署 / license server / NVIDIA License System / license-system-deploy / 部署 license 服务器 / CLS 配置 / DLS 虚拟设备 / dls_registration / license client token / 授权服务器 / vGPU license / nvidia-gridd license
+
+### 文件结构 File structure
+
+```
+license-system-deploy.skill
+├── SKILL.md                        ← 主流程：Human Prerequisites → Phase A B C D E
+├── scripts/
+│   └── check_dls_prereqs.sh        ← DLS 环境预检脚本
+└── references/
+    ├── human-operations-guide.md   ← 🧑 Portal/Web UI 详细操作手册
+    ├── platform-requirements.md    ← 硬件要求、端口、支持平台
+    ├── dls-setup-tool.md           ← dls_registration/dls_configuration 工具用法
+    ├── client-config.md            ← Token 生成 + Linux/Windows 客户端配置
+    ├── ha-config.md                ← HA 集群、故障转移、虚拟 IP
+    └── troubleshooting.md          ← 常见问题排障
+```
+
+---
+
+## 怎么触发？ How to trigger
+
+把 `.skill` 文件放到 Agent 的 skills 目录，对话中提及对应关键词即可触发。
+
+Place the `.skill` file in your agent's skills directory, then mention any trigger keyword in conversation.
+
+---
+
+## Phase 路线图 Phase roadmap (vgpu-kvm-config)
 
 ```
 Phase 0 ─── 一次性主机准备 (BIOS → display mode → OS → driver → SR-IOV)
    │
    ├── Phase A ─── 纯时间分片 (MIG OFF, 最高密度, 无隔离)
-   │
    ├── Phase B ─── MIG 硬件隔离 (Blackwell only, 1 vGPU = 1 GI, QoS 保证)
-   │
    ├── Phase C ─── MIG + TimeSlice (GI 间隔离, GI 内分片, 部门共享)
-   │
    ├── Phase D ─── Guest CI Split (Phase B 得到的 GI 在 VM 内再拆 CI)
-   │
-   └── Phase E ─── 全拆清理 (删 vGPU → 销毁 CI/GI → 关闭 MIG)
+   └── Phase E ─── 全拆清理
 ```
-
----
 
 ## 前提条件 Prerequisites
 
@@ -95,40 +133,12 @@ Phase 0 ─── 一次性主机准备 (BIOS → display mode → OS → driver
 - **Agent 侧**: 能免密 SSH 到 KVM 主机 (`ssh root@<host>`)
 - **BIOS**: SR-IOV、VT-d、ARI (AMD)、Above 4G 均已开启
 - **vGPU 软件包**: NVIDIA vGPU Manager `.run` 包已下载到主机
-
----
-
-## 典型对话示例 Example conversations
-
-### 示例 1：全新部署 Example 1: Fresh deployment
-
-> **用户**: 帮我在 192.168.1.100 上配置 vGPU，GPU 是 RTX PRO 6000，要 8 个 Windows 虚拟机做 VDI。
->
-> **Agent**: [加载 skill → Quick Decision 判定走 Phase A 纯时分 → SSH 到主机 → Phase 0 检查环境 → Phase A 创建 vGPU → 输出结果]
-
-### 示例 2：MIG 隔离 Example 2: MIG isolation
-
-> **用户**: 我有 RTX PRO 6000，4 个用户每人需要 24GB 显存，不能互相干扰。
->
-> **Agent**: [加载 skill → 查类型表: 4× DC-1-24Q → Quick Decision 判定 Phase B → 开启 MIG → 创建 4 个 1g.24gb+gfx GI → 每个 GI 上建一个 vGPU → 完成]
-
-### 示例 3：排障 Example 3: Troubleshooting
-
-> **用户**: vGPU 授权不生效，Windows VM 里 nvidia-smi 显示 Unlicensed。
->
-> **Agent**: [加载 skill → 查 troubleshooting → 定位: token 路径或服务未重启 → 给出 Windows 路径和重启服务命令]
-
----
-
-## 与 HTML 参考页的关系 Relation to HTML reference
-
-项目里还有一个 `vgpu-kvm-reference.html` — 这是给人看的可视化参考页面（流程卡片 + 场景对比 + 决策矩阵），可以在浏览器打开。Skill 是给 AI 执行的指令集，HTML 是给人理解的速查图。两者内容同源，功能互补。
-
-The project also includes `vgpu-kvm-reference.html` — a visual reference page for humans (flow cards + scenario comparison + decision matrix), openable in a browser. The Skill is the executable instruction set for AI; the HTML is the quick-reference diagram for people. Same source material, complementary roles.
+- **License 部署**: NVIDIA Licensing Portal 账号 + 有效的 license 授权
 
 ---
 
 ## 版本 Version
 
-基于 NVIDIA Virtual GPU Software User Guide Release 20.0。针对 Blackwell (RTX PRO 6000) 验证。
-Based on NVIDIA Virtual GPU Software User Guide Release 20.0. Validated against Blackwell (RTX PRO 6000).
+基于 NVIDIA Virtual GPU Software Release 20.0 + NVIDIA License System v3.6.1。针对 Blackwell (RTX PRO 6000) 验证。
+
+Based on NVIDIA Virtual GPU Software Release 20.0 + NVIDIA License System v3.6.1. Validated against Blackwell (RTX PRO 6000).
