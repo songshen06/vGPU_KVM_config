@@ -9,7 +9,7 @@
 | `sriov-manage` fails | IOMMU kernel params missing | `dmesg \| grep -i iommu` for errors. Add `intel_iommu=on iommu=pt` to kernel params. |
 | MIG creation fails | GPU still in use | Stop all VMs first. Check `nvidia-smi` for active processes. |
 | vGPU `available_instances = 0` | VF already occupied, or MIG mode mismatch | VF can only hold 1 vGPU. When MIG enabled, time-sliced types show 0; when MIG disabled, MIG-backed types show 0. |
-| Guest driver won't load | Version mismatch | VGPU Manager must match Guest Driver version. Check release notes for compatible pairs. |
+| Guest driver won't load | Incompatible guest driver | Guest and host driver versions need not be identical, but must be from a compatible release. Check the vGPU release notes for the supported guest driver for your vGPU Manager version. |
 | License not acquired | Token path or service not restarted | Linux: `/etc/nvidia/ClientConfigToken/`. Windows: `C:\Program Files\NVIDIA Corporation\vGPU Licensing\ClientConfigToken\`. Restart `nvidia-gridd` (Linux) or "NVIDIA Display Container LS" (Windows). |
 | MIG GI/CI lost after reboot | MIG non-persistent by design | Add `nvidia-smi -mig 1` and `mig -cgi ...` to system startup script or systemd oneshot service. |
 | Mixed-size mode lost after reboot | Non-persistent | Re-run `nvidia-smi vgpu -i <id> -gi <id> -shm 1` after each reboot. |

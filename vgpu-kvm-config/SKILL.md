@@ -175,10 +175,23 @@ nvidia-smi -i 0 --query-gpu=mig.mode.current --format=csv,noheader  # → Enable
 ### B.2 Create GPU Instances
 
 ```bash
-nvidia-smi mig -lgip                    # list profiles; use +gfx only
-nvidia-smi mig -cgi <profile-id>,...   # e.g. 38,38 for 2× 1g.36gb+gfx
-nvidia-smi mig -cci                     # create default CI on all GIs
-nvidia-smi                              # verify GI/CI table
+# 1. List available GI profiles — only "+gfx" profiles work for vGPU
+nvidia-smi mig -lgip
+# RTX PRO 6000 Blackwell (96GB) 只有 3 个 +gfx profile：
+#   MIG 1g.24gb+gfx   (id 47)   最多 4 个
+#   MIG 2g.48gb+gfx   (id 35)   最多 2 个
+#   MIG 4g.96gb+gfx   (id 32)   最多 1 个
+
+# 2. Create GIs by profile id (comma-separated)
+nvidia-smi mig -cgi 47,47,47,47        # 4× 1g.24gb+gfx → 4 个隔离用户
+nvidia-smi mig -cgi 35,35              # 2× 2g.48gb+gfx
+nvidia-smi mig -cgi 32                 # 1× 4g.96gb+gfx（整卡 1 个 GI）
+
+# 3. Create default CI on all GIs
+nvidia-smi mig -cci
+
+# 4. Verify GI/CI table
+nvidia-smi
 ```
 
 ### B.3 Create MIG-backed vGPUs
