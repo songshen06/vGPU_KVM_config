@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "required": [
+    "schema_version",
+    "tool_version",
+    "generated_at",
+    "parse_mode",
+    "confidence",
+    "input_file",
+    "stats",
+    "selection_policy",
+    "top_templates",
+    "top_events",
+    "inspection_object"
+  ],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "tool_version": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "parse_mode": { "type": "string", "enum": ["scored_templates"] },
+    "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+    "input_file": { "type": "string" },
+    "stats": {
+      "type": "object",
+      "required": ["total_lines", "kept_lines", "template_count"],
+      "properties": {
+        "total_lines": { "type": "integer", "minimum": 0 },
+        "kept_lines": { "type": "integer", "minimum": 0 },
+        "template_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "selection_policy": { "type": "object" },
+    "top_templates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rank", "template", "count", "score"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1 },
+          "template": { "type": "string" },
+          "count": { "type": "integer", "minimum": 0 },
+          "score": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "top_events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["line", "score", "reasons", "raw", "template"],
+        "properties": {
+          "line": { "type": "integer", "minimum": 1 },
+          "score": { "type": "integer", "minimum": 0 },
+          "reasons": { "type": "array", "items": { "type": "string" } },
+          "raw": { "type": "string" },
+          "template": { "type": "string" }
+        }
+      }
+    },
+    "inspection_object": {
+      "type": "object",
+      "required": ["focus_objects", "hit_counts", "hits"],
+      "properties": {
+        "focus_objects": { "type": "array", "items": { "type": "string" } },
+        "hit_counts": { "type": "object" },
+        "hits": { "type": "object" }
+      }
+    },
+    "host_profile": { "type": "object" }
+  }
+}

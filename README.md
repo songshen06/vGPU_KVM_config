@@ -1,8 +1,8 @@
 # vGPU KVM Config · Agent Skills
 
-> NVIDIA vGPU 部署的 AI Agent 技能包。两个独立 skill，覆盖从 GPU 虚拟化到 License 服务的完整链路。
+> NVIDIA vGPU 部署的 AI Agent 技能包。四个独立 skill，覆盖从 GPU 虚拟化、License 服务到日志分析排障的完整链路。
 
-> Agent skill bundle for NVIDIA vGPU deployment on Linux KVM. Two independent skills covering the full pipeline from GPU virtualization to license serving.
+> Agent skill bundle for NVIDIA vGPU deployment on Linux KVM. Four independent skills covering the full pipeline from GPU virtualization, license serving, to log analysis and troubleshooting.
 
 ---
 
@@ -75,10 +75,16 @@
 |---|---|---|
 | **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config.skill` |
 | **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy.skill` |
+| **log-key-extractor** | 大日志压缩成 LLM 上下文：模板聚合 + 打分事件 + host 画像 | `log-key-extractor.skill` |
+| **vgpu-report** | NVIDIA vGPU bug-report 分析：Xid 计数、崩溃循环、pin 失败、风险分级 | `vgpu-report.skill` |
 
 两者互补：`vgpu-kvm-config` 把 GPU 切成 vGPU 分给 VM，`license-system-deploy` 部署 License 服务器让 VM 里的 GPU 驱动能拿到授权。
 
 These two skills complement each other: `vgpu-kvm-config` partitions GPUs into vGPUs and assigns them to VMs; `license-system-deploy` sets up the license server so the GPU drivers inside VMs can obtain licenses.
+
+另外两个 skill 用于**排障**：`log-key-extractor` 把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文，`vgpu-report` 直接产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）。
+
+The other two skills are for **troubleshooting**: `log-key-extractor` shrinks huge nvidia-bug-report logs into LLM-readable context, and `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
 
 ---
 
@@ -165,6 +171,61 @@ license-system-deploy.skill
     ├── client-config.md            ← Token 生成 + Linux/Windows 客户端配置
     ├── ha-config.md                ← HA 集群、故障转移、虚拟 IP
     └── troubleshooting.md          ← 常见问题排障
+```
+
+---
+
+## log-key-extractor
+
+### 能做什么？ Capabilities
+
+| 场景 Scenario | 你只需说 You just say | 说明 |
+|---|---|---|
+| 压缩超大日志 | "这个日志太大，帮我提取关键信息给 LLM" | 模板聚合 + 打分事件 |
+| NVIDIA bug-report 画像 | "提取这台机器的 host/GPU 硬件信息" | host_profile 提取 |
+| 聚焦某对象 | "只看这个 vGPU UUID / VM 名相关的行" | `--focus-object` |
+
+### 触发关键词 Trigger keywords
+
+> 日志太大 / 提取关键日志 / log key extract / 日志压缩 / 日志摘要 / nvidia bug report 画像 / focus object / 大日志分析
+
+### 文件结构 File structure
+
+```
+log-key-extractor.skill
+├── SKILL.md
+├── scripts/
+│   └── log_key_extract.py
+├── schemas/
+│   └── llm_context.schema.json
+└── references/
+    └── tuning.md
+```
+
+---
+
+## vgpu-report
+
+### 能做什么？ Capabilities
+
+| 场景 Scenario | 你只需说 You just say | 说明 |
+|---|---|---|
+| 分析 vGPU 故障日志 | "分析这份 nvidia-bug-report.log" | 全量 GPU/vGPU 清单 + Xid 精确计数 |
+| 风险评级 | "这台 vGPU 主机健康吗" | CRITICAL/HIGH/WARNING/INFO 规则化分级 |
+| 崩溃循环定位 | "哪个 VM 在反复重启" | 每 mdev 的 start call 计数 |
+| 内存 pin 排障 | "Failed to pin 是哪来的" | 按 mdev 聚合 pin/IOCTL 失败 |
+
+### 触发关键词 Trigger keywords
+
+> vGPU 日志分析 / nvidia-bug-report / Xid 分析 / vGPU 崩溃循环 / vGPU 风险评级 / vgpu report / bug report 分析 / 分析 vGPU 日志
+
+### 文件结构 File structure
+
+```
+vgpu-report.skill
+├── SKILL.md
+└── scripts/
+    └── vgpu_report.py
 ```
 
 ---
