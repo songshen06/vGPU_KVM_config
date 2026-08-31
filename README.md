@@ -236,6 +236,9 @@ vgpu-report.skill
 
 Place the `.skill` file in your agent's skills directory, then mention any trigger keyword in conversation.
 
+> 🤖 **给 Agent 的自安装说明**：直接把仓库链接丢给 Agent，它会读根目录的 `AGENTS.md` 并自行安装这 4 个 skill。
+> 🤖 **Self-install for agents**: hand the repo link to an agent; it reads `AGENTS.md` at the repo root and installs the 4 skills itself.
+
 ---
 
 ## Phase 路线图 Phase roadmap (vgpu-kvm-config)
