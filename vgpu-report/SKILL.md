@@ -13,6 +13,15 @@ Use this skill when the user asks to analyze an `nvidia-bug-report.log` for vGPU
 python3 skills/vgpu-report/scripts/vgpu_report.py <input_log> --out-dir nr_out/vgpu --out-prefix vgpu_report
 ```
 
+For a large bug report that also needs focused raw evidence, run the unified workflow. It runs this report first, selects suspect mdev UUIDs and GPU BDFs, then runs `log-key-extractor` on the same input:
+
+```bash
+python3 skills/vgpu-report/scripts/analyze_vgpu_bundle.py <input_log> \
+  --out-dir nr_out/vgpu-bundle
+```
+
+This command requires the `log-key-extractor` skill directory beside `vgpu-report` in the same skills directory.
+
 ## What it reports (all parsed from the log, not guessed)
 
 1. **GPU inventory** — every physical GPU: model, driver, VRAM, VBIOS, BDF, serial (from `NVIDIA GPU Details`).
@@ -42,4 +51,4 @@ python3 skills/vgpu-report/scripts/vgpu_report.py <input_log> --out-dir nr_out/v
 
 ## Related
 
-For shrinking a huge log into compact LLM context (templates + scored events), use the `log-key-extractor` skill.
+Use `log-key-extractor` as the second-stage evidence collector, not as a replacement for this report. Both tools read the same raw log: this skill identifies affected objects and risk, while the extractor returns scored events and context windows around those objects.

@@ -86,6 +86,26 @@ These two skills complement each other: `vgpu-kvm-config` partitions GPUs into v
 
 The other two skills are for **troubleshooting**: `log-key-extractor` shrinks huge nvidia-bug-report logs into LLM-readable context, and `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
 
+### vGPU 日志联合分析 Combined vGPU Log Analysis
+
+两个工具读取同一份原始 `nvidia-bug-report.log`。`vgpu-report` 先定位高风险 GPU、mdev 和 VM，`log-key-extractor` 再围绕这些对象提取上下文证据：
+
+```text
+nvidia-bug-report.log
+  ├── vgpu-report        → inventory / Xid / crash loop / risk
+  └── log-key-extractor  → focused events / context windows
+                              ↑ focus objects from vgpu-report
+```
+
+统一入口：
+
+```bash
+python3 vgpu-report/scripts/analyze_vgpu_bundle.py nvidia-bug-report.log \
+  --out-dir nr_out/vgpu-bundle
+```
+
+输出包含结构化报告、LLM 上下文、事件窗口和记录两者关联关系的 `bundle_manifest.json`。
+
 ---
 
 ## vgpu-kvm-config
@@ -226,6 +246,7 @@ log-key-extractor/
 vgpu-report/
 ├── SKILL.md
 └── scripts/
+    ├── analyze_vgpu_bundle.py
     └── vgpu_report.py
 ```
 

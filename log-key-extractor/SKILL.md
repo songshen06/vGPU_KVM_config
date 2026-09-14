@@ -10,11 +10,13 @@ For NVIDIA bug-report scenarios, also use it to extract host hardware/OS summary
 
 ## Workflow
 
+For generic logs, run the extractor directly. For an NVIDIA vGPU bug report, run `vgpu-report` first to identify suspect GPU BDFs, mdev UUIDs, and VMs, then run this extractor on the same raw log with those values as `--focus-object`. Do not use `vgpu_report.json` as the extractor's log input.
+
 1. Run the extractor script on the raw log.
 2. Check `llm_context.md` for quick quality validation.
 3. If output is too noisy, increase `--min-score` or reduce `--top-events`.
 4. If evidence is too thin, increase `--context-lines`.
-5. Feed `llm_context.json` and `event_windows.json` to the LLM.
+5. Feed `llm_context.json`, `event_windows.json`, and the companion `vgpu_report.json` to the LLM.
 
 ## Command
 
@@ -63,4 +65,8 @@ Read `references/tuning.md` when you need profile-specific tuning.
 
 ## Related
 
-For structured NVIDIA vGPU bug-report analysis (GPU/vGPU inventory, Xid accounting, reboot-loop detection, risk level), use the `vgpu-report` skill instead.
+For NVIDIA vGPU bug reports, use the `vgpu-report` skill for structured diagnosis and this skill for focused raw evidence. When both skill directories are installed together, the unified entry point is:
+
+```bash
+python3 skills/vgpu-report/scripts/analyze_vgpu_bundle.py <nvidia-bug-report.log>
+```
