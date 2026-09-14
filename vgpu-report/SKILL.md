@@ -1,6 +1,6 @@
 ---
 name: vgpu-report
-description: Analyze NVIDIA vGPU bug-report logs. Produces a structured report: GPU/vGPU inventory, precise Xid error accounting, VM reboot-loop detection, memory-pin failures, and a transparent rule-based risk level. Use when analyzing an nvidia-bug-report.log for vGPU problems or when you need a health/risk assessment of a vGPU host.
+description: "Analyze NVIDIA vGPU bug-report logs. Produces a structured report: GPU/vGPU inventory, precise Xid error accounting, VM reboot-loop detection, memory-pin failures, and a transparent rule-based risk level. Use when analyzing an nvidia-bug-report.log for vGPU problems or when you need a health/risk assessment of a vGPU host."
 ---
 
 # vGPU Bug-Report Analyzer

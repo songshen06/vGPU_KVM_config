@@ -6,10 +6,10 @@
 set -euo pipefail
 FAILS=0
 
-check() {
-    local label="$1"; shift
+check_module() {
+    local label="$1" module="$2"
     echo -n "  [$label] "
-    if "$@" &>/dev/null; then
+    if lsmod 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -Fxq "$module"; then
         echo "OK"
     else
         echo "FAIL"
@@ -21,14 +21,25 @@ echo "=== NVIDIA vGPU KVM Environment Check ==="
 echo ""
 
 echo "--- Kernel Module Checks ---"
-check "VFIO mdev"    lsmod | grep -qw vfio_mdev
-check "nvidia_vgpu"  lsmod | grep -qw nvidia_vgpu_vfio
-check "nvidia"       lsmod | grep -qw nvidia
-check "vfio"         lsmod | grep -qw vfio
+check_module "nvidia_vgpu" nvidia_vgpu_vfio
+check_module "nvidia"      nvidia
+check_module "vfio"        vfio
+echo -n "  [VFIO mdev] "
+if lsmod 2>/dev/null | awk 'NR > 1 { print $1 }' | grep -Fxq vfio_mdev; then
+    echo "OK"
+else
+    echo "NOT LOADED (required only for the mdev backend)"
+fi
 
 echo ""
 echo "--- Service Checks ---"
-check "libvirtd"     systemctl is-active --quiet libvirtd
+echo -n "  [libvirt daemon] "
+if systemctl is-active --quiet libvirtd || systemctl is-active --quiet virtqemud; then
+    echo "OK"
+else
+    echo "FAIL (neither libvirtd nor virtqemud is active)"
+    FAILS=$((FAILS + 1))
+fi
 
 echo ""
 echo "--- GPU Visibility ---"

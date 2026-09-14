@@ -1,6 +1,6 @@
 ---
 name: vgpu-kvm-config
-description: Configure and monitor NVIDIA vGPU on Linux KVM (Red Hat / Ubuntu). Covers environment checks, vGPU creation (legacy mdev and SR-IOV), MIG mode setup (GPU instance + compute instance creation), MIG-backed vGPU configuration, and time-sliced partitioning on MIG instances. Includes RTX PRO 6000 Blackwell vGPU type tables and monitoring via nvidia-smi. Use when the user needs to set up or inspect vGPU on KVM, configure MIG for vGPU, create MIG-backed or time-sliced vGPUs, check environment prerequisites, or look up supported vGPU types for NVIDIA GPUs.
+description: Configure and monitor NVIDIA vGPU on Linux KVM (Red Hat / Ubuntu). Covers environment checks, vGPU creation (legacy mdev and SR-IOV), MIG mode setup (GPU instance + compute instance creation), MIG-backed vGPU configuration, and time-sliced partitioning on MIG instances. Includes Blackwell vGPU type discovery guidance, reference tables, and monitoring via nvidia-smi. Use when the user needs to set up or inspect vGPU on KVM, configure MIG for vGPU, create MIG-backed or time-sliced vGPUs, check environment prerequisites, or look up supported vGPU types for NVIDIA GPUs.
 ---
 
 # vGPU KVM Quick Reference
@@ -27,15 +27,28 @@ ENDSSH
 
 Prerequisite: SSH key-based auth from agent machine to KVM host.
 
+## VFIO Backend Routing
+
+Determine the backend from the interface exposed by the target VF, not from the OS name alone:
+
+```bash
+bash scripts/detect_vfio_backend.sh            # list all detected VF interfaces
+bash scripts/detect_vfio_backend.sh <vf-bdf>   # inspect one selected VF
+```
+
+- `mdev`: Follow the creation, attachment, placement, and teardown procedures below.
+- `vendor-specific`: This skill currently detects but does not apply this backend. Stop before creating or deleting a vGPU and report that a vendor-specific VFIO procedure is required.
+- `unsupported`: Stop and collect the GPU model, driver version, VF BDF, and relevant sysfs paths. Do not guess a backend.
+
+The detailed procedures below currently target the mdev VFIO framework, including SR-IOV GPUs on hosts that expose `mdev_supported_types`.
+
 ## Quick Decision
 
 ```bash
-# 1. Quick env check
-lsmod | grep vfio && nvidia-smi          # must see nvidia_vgpu_vfio + GPU listed
-/usr/lib/nvidia/sriov-manage -e all      # enable VFs
-ls /sys/class/mdev_bus/                  # verify VFs present
+# 1. Read-only environment check
+bash scripts/vgpu_env_check.sh
 
-# 2. Discover your VF PCI addresses (use these instead of the example BDFs below)
+# 2. mdev backend only: discover VF PCI addresses
 ls /sys/class/mdev_bus/
 # Example output: 0000:02:00.2  0000:02:00.3  ...  0000:02:00.33
 # Pick an unused VF as your target BDF. Each VF holds exactly 1 vGPU.
@@ -53,7 +66,7 @@ ls /sys/class/mdev_bus/
 
 For host setup (BIOS, display mode, OS, driver install) and teardown, see `references/host-setup.md`.
 For troubleshooting, see `references/troubleshooting.md`.
-For RTX PRO 6000 vGPU type tables, see `references/vgpu-types-rtx-pro-6000.md`.
+For Blackwell vGPU type discovery and reference tables, see `references/vgpu-types-blackwell.md`.
 
 ---
 
@@ -264,8 +277,9 @@ nvidia-smi -q | grep License            # license status
 
 | File | Content |
 |---|---|
-| `references/vgpu-types-rtx-pro-6000.md` | RTX PRO 6000 GI profiles + Q/B/A type tables + config examples |
+| `references/vgpu-types-blackwell.md` | Runtime discovery for Blackwell GPUs + validated per-SKU reference tables |
 | `references/host-setup.md` | One-time: BIOS, display mode switch, OS prep, vGPU Manager install, teardown |
 | `references/troubleshooting.md` | 7 common issues: driver bind, SR-IOV BIOS, IOMMU, MIG conflict, version mismatch, license |
 | `references/guest-ci-split.md` | Phase D: Guest VM compute instance sub-partitioning (Ch.5 §5.4) |
+| `scripts/detect_vfio_backend.sh` | Read-only capability detection for mdev vs vendor-specific VFIO |
 | `scripts/vgpu_env_check.sh` | One-shot environment check script |

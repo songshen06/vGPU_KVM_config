@@ -1,4 +1,43 @@
-# RTX PRO 6000 Blackwell Server Edition — vGPU Types
+# Blackwell Architecture — vGPU Type Discovery and Reference
+
+Use the target host's runtime output as the source of truth. Supported profiles and numeric type IDs depend on the exact GPU SKU, vGPU Manager release, VFIO backend, and current MIG mode. Never select a vGPU type solely from a static table.
+
+## Runtime Discovery
+
+First identify the exact GPU and available MIG profiles:
+
+```bash
+nvidia-smi --query-gpu=index,name,pci.bus_id,driver_version,mig.mode.current --format=csv
+nvidia-smi mig -lgip
+nvidia-smi vgpu -s -v
+```
+
+For an mdev VFIO host, list only types that are currently creatable on the selected VF:
+
+```bash
+vf_bdf="<domain:bus:slot.function>"
+types_dir="/sys/class/mdev_bus/$vf_bdf/mdev_supported_types"
+for type_dir in "$types_dir"/nvidia-*; do
+    [ -d "$type_dir" ] || continue
+    printf '%s : %s : available=%s\n' \
+        "${type_dir##*/}" \
+        "$(cat "$type_dir/name")" \
+        "$(cat "$type_dir/available_instances")"
+done
+```
+
+For a vendor-specific VFIO host, query the selected SR-IOV VF directly:
+
+```bash
+vf_bdf="<domain:bus:slot.function>"
+cat "/sys/bus/pci/devices/$vf_bdf/nvidia/creatable_vgpu_types"
+```
+
+If runtime output conflicts with a table below, follow the runtime output and the documentation for the installed vGPU Manager release.
+
+## Validated Reference: RTX PRO 6000 Blackwell Server Edition
+
+The tables below are a reference snapshot for this specific 96 GB SKU. Add separate, clearly labeled subsections when other Blackwell SKUs have been validated; do not extrapolate capacities from this model.
 
 Physical GPUs per board: 1. Total frame buffer: ~96 GB. Supports both MIG-backed and time-sliced vGPUs.
 
