@@ -75,16 +75,16 @@
 |---|---|---|
 | **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config.skill` |
 | **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy.skill` |
-| **log-key-extractor** | 大日志压缩成 LLM 上下文：模板聚合 + 打分事件 + host 画像 | `log-key-extractor.skill` |
+| **log-key-extractor** | 大日志压缩 + vGPU 联合分析：LLM 上下文提取、bug-report 内嵌日志还原、迁移/ENODEV 故障取证 | `log-key-extractor/` |
 | **vgpu-report** | NVIDIA vGPU bug-report 分析：Xid 计数、崩溃循环、pin 失败、风险分级 | `vgpu-report.skill` |
 
 两者互补：`vgpu-kvm-config` 把 GPU 切成 vGPU 分给 VM，`license-system-deploy` 部署 License 服务器让 VM 里的 GPU 驱动能拿到授权。
 
 These two skills complement each other: `vgpu-kvm-config` partitions GPUs into vGPUs and assigns them to VMs; `license-system-deploy` sets up the license server so the GPU drivers inside VMs can obtain licenses.
 
-另外两个 skill 用于**排障**：`log-key-extractor` 把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文，`vgpu-report` 直接产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）。
+另外两个 skill 用于**排障**：`log-key-extractor`（含 3 个工具）把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文、从 bug report 二进制流中还原被 logrotate 走的轮转 libvirt 日志、并对 vGPU 迁移/ENODEV/FLR 类故障做多源联合分析；`vgpu-report` 直接产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）。
 
-The other two skills are for **troubleshooting**: `log-key-extractor` shrinks huge nvidia-bug-report logs into LLM-readable context, and `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
+The other two skills are for **troubleshooting**: `log-key-extractor` (3 tools) shrinks huge nvidia-bug-report logs into LLM-readable context, recovers logrotated libvirt logs embedded as raw gzip inside bug reports, and runs multi-source combined analysis for vGPU migration / ENODEV / FLR-close failures; `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
 
 ---
 
@@ -184,22 +184,28 @@ license-system-deploy.skill
 | 压缩超大日志 | "这个日志太大，帮我提取关键信息给 LLM" | 模板聚合 + 打分事件 |
 | NVIDIA bug-report 画像 | "提取这台机器的 host/GPU 硬件信息" | host_profile 提取 |
 | 聚焦某对象 | "只看这个 vGPU UUID / VM 名相关的行" | `--focus-object` |
+| vGPU 结构化体检 | "分析这个 bug report 的 Xid/崩溃循环/pin 失败" | `vgpu_report.py`，产出风险分级 |
+| 还原内嵌轮转日志 | "bug report 里被 logrotate 走的 VM 日志能找回吗" | `extract_embedded_gz.py` 从二进制流还原 .gz |
+| vGPU 联合分析 | "VM 起不来 / 报 vfio No such device / 有人做了热迁移？" | 多源交叉取证，见 `references/combined-vgpu-analysis.md` |
 
 ### 触发关键词 Trigger keywords
 
-> 日志太大 / 提取关键日志 / log key extract / 日志压缩 / 日志摘要 / nvidia bug report 画像 / focus object / 大日志分析
+> 日志太大 / 提取关键日志 / log key extract / 日志压缩 / 日志摘要 / nvidia bug report 画像 / focus object / 大日志分析 / VM 启动失败 / error getting device from group / ENODEV / migrate-incoming / Not a migration stream / VF FLR failed / 热迁移取证
 
 ### 文件结构 File structure
 
 ```
-log-key-extractor.skill
+log-key-extractor/
 ├── SKILL.md
 ├── scripts/
-│   └── log_key_extract.py
+│   ├── log_key_extract.py        # 大日志 → LLM 上下文
+│   ├── vgpu_report.py            # vGPU 结构化分析（Xid/循环/pin/风险分级）
+│   └── extract_embedded_gz.py    # 还原 bug report 内嵌的轮转 .gz 日志
 ├── schemas/
 │   └── llm_context.schema.json
 └── references/
-    └── tuning.md
+    ├── tuning.md                  # log_key_extract 调参
+    └── combined-vgpu-analysis.md  # vGPU 多源联合分析方法论（迁移/ENODEV/FLR 签名、红鲱鱼、6 步流程）
 ```
 
 ---
