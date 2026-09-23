@@ -1,6 +1,6 @@
 ---
 name: vgpu-report
-description: Analyze NVIDIA vGPU bug-report logs. Produces a structured report: GPU/vGPU inventory, precise Xid error accounting, VM reboot-loop detection, memory-pin failures, and a transparent rule-based risk level. Use when analyzing an nvidia-bug-report.log for vGPU problems or when you need a health/risk assessment of a vGPU host.
+description: "Analyze NVIDIA vGPU bug-report logs. Produces a structured report: GPU/vGPU inventory, precise Xid error accounting, VM reboot-loop detection, memory-pin failures, and a transparent rule-based risk level. Use when analyzing an nvidia-bug-report.log for vGPU problems or when you need a health/risk assessment of a vGPU host."
 ---
 
 # vGPU Bug-Report Analyzer
@@ -12,6 +12,15 @@ Use this skill when the user asks to analyze an `nvidia-bug-report.log` for vGPU
 ```bash
 python3 skills/vgpu-report/scripts/vgpu_report.py <input_log> --out-dir nr_out/vgpu --out-prefix vgpu_report
 ```
+
+For a large bug report that also needs focused raw evidence, run the unified workflow. It runs this report first, selects suspect mdev UUIDs and GPU BDFs, then runs `log-key-extractor` on the same input:
+
+```bash
+python3 skills/vgpu-report/scripts/analyze_vgpu_bundle.py <input_log> \
+  --out-dir nr_out/vgpu-bundle
+```
+
+This command requires the `log-key-extractor` skill directory beside `vgpu-report` in the same skills directory.
 
 ## What it reports (all parsed from the log, not guessed)
 
@@ -42,4 +51,4 @@ python3 skills/vgpu-report/scripts/vgpu_report.py <input_log> --out-dir nr_out/v
 
 ## Related
 
-For shrinking a huge log into compact LLM context (templates + scored events), use the `log-key-extractor` skill.
+Use `log-key-extractor` as the second-stage evidence collector, not as a replacement for this report. Both tools read the same raw log: this skill identifies affected objects and risk, while the extractor returns scored events and context windows around those objects.

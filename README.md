@@ -71,12 +71,12 @@
 
 ## Skills
 
-| Skill | 用途 Purpose | 文件 File |
+| Skill | 用途 Purpose | 源码目录 Source directory |
 |---|---|---|
-| **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config.skill` |
-| **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy.skill` |
+| **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config/` |
+| **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy/` |
 | **log-key-extractor** | 大日志压缩 + vGPU 联合分析：LLM 上下文提取、bug-report 内嵌日志还原、迁移/ENODEV 故障取证 | `log-key-extractor/` |
-| **vgpu-report** | NVIDIA vGPU bug-report 分析：Xid 计数、崩溃循环、pin 失败、风险分级 | `vgpu-report.skill` |
+| **vgpu-report** | NVIDIA vGPU bug-report 分析：Xid 计数、崩溃循环、pin 失败、风险分级 | `vgpu-report/` |
 
 两者互补：`vgpu-kvm-config` 把 GPU 切成 vGPU 分给 VM，`license-system-deploy` 部署 License 服务器让 VM 里的 GPU 驱动能拿到授权。
 
@@ -85,6 +85,26 @@ These two skills complement each other: `vgpu-kvm-config` partitions GPUs into v
 另外两个 skill 用于**排障**：`log-key-extractor`（含 3 个工具）把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文、从 bug report 二进制流中还原被 logrotate 走的轮转 libvirt 日志、并对 vGPU 迁移/ENODEV/FLR 类故障做多源联合分析；`vgpu-report` 直接产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）。
 
 The other two skills are for **troubleshooting**: `log-key-extractor` (3 tools) shrinks huge nvidia-bug-report logs into LLM-readable context, recovers logrotated libvirt logs embedded as raw gzip inside bug reports, and runs multi-source combined analysis for vGPU migration / ENODEV / FLR-close failures; `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
+
+### vGPU 日志联合分析 Combined vGPU Log Analysis
+
+两个工具读取同一份原始 `nvidia-bug-report.log`。`vgpu-report` 先定位高风险 GPU、mdev 和 VM，`log-key-extractor` 再围绕这些对象提取上下文证据：
+
+```text
+nvidia-bug-report.log
+  ├── vgpu-report        → inventory / Xid / crash loop / risk
+  └── log-key-extractor  → focused events / context windows
+                              ↑ focus objects from vgpu-report
+```
+
+统一入口：
+
+```bash
+python3 vgpu-report/scripts/analyze_vgpu_bundle.py nvidia-bug-report.log \
+  --out-dir nr_out/vgpu-bundle
+```
+
+输出包含结构化报告、LLM 上下文、事件窗口和记录两者关联关系的 `bundle_manifest.json`。
 
 ---
 
@@ -99,7 +119,7 @@ The other two skills are for **troubleshooting**: `log-key-extractor` (3 tools) 
 | 部门级分层 | "工程部 4 人共享半个 GPU，数据部 2 人独占另半个" | 0 → B → C |
 | 租户自助切分 | "给研究员一台 VM，让他在 VM 里自己拆 MIG" | 0 → B → D |
 | 环境体检 | "检查一下 KVM 主机 vGPU 环境是否就绪" | 运行 env_check 脚本 |
-| 查 vGPU 类型 | "RTX PRO 6000 最多能开几个 DC-3Q？" | 查类型表 |
+| 查 vGPU 类型 | "这张 Blackwell 卡支持哪些 vGPU 类型？" | 运行时发现 + 查架构参考表 |
 | 排障 | "vGPU 创建失败、授权不对、MIG 丢失..." | 查 troubleshooting |
 | 全拆清理 | "把 GPU 恢复成普通单卡模式，删掉所有 vGPU" | E |
 
@@ -110,13 +130,14 @@ The other two skills are for **troubleshooting**: `log-key-extractor` (3 tools) 
 ### 文件结构 File structure
 
 ```
-vgpu-kvm-config.skill
+vgpu-kvm-config/
 ├── SKILL.md                   ← 主流程：Phase 0/Quick Decision → A B C D E
 ├── scripts/
+│   ├── detect_vfio_backend.sh ← 只读识别 mdev/vendor-specific VFIO
 │   └── vgpu_env_check.sh      ← 一键环境体检脚本
 └── references/
     ├── host-setup.md          ← Phase 0 (BIOS/OS/驱动) + Phase E (Teardown)
-    ├── vgpu-types-rtx-pro-6000.md  ← RTX PRO 6000 Q/B/A 类型全表
+    ├── vgpu-types-blackwell.md     ← Blackwell 类型发现方法 + 各 SKU 参考表
     ├── troubleshooting.md     ← 7 类常见故障 + 文件系统路径速查
     └── guest-ci-split.md      ← Phase D: VM 内二次切分 CI
 ```
@@ -160,7 +181,7 @@ Human 操作指南（每个按钮、字段、下拉选项精确标注）在 `ref
 ### 文件结构 File structure
 
 ```
-license-system-deploy.skill
+license-system-deploy/
 ├── SKILL.md                        ← 主流程：Human Prerequisites → Phase A B C D E
 ├── scripts/
 │   └── check_dls_prereqs.sh        ← DLS 环境预检脚本
@@ -228,9 +249,10 @@ log-key-extractor/
 ### 文件结构 File structure
 
 ```
-vgpu-report.skill
+vgpu-report/
 ├── SKILL.md
 └── scripts/
+    ├── analyze_vgpu_bundle.py
     └── vgpu_report.py
 ```
 
@@ -238,12 +260,12 @@ vgpu-report.skill
 
 ## 怎么触发？ How to trigger
 
-把 `.skill` 文件放到 Agent 的 skills 目录，对话中提及对应关键词即可触发。
+把所需的 skill 源码目录复制到 Agent 的 skills 目录，对话中提及对应关键词即可触发。
 
-Place the `.skill` file in your agent's skills directory, then mention any trigger keyword in conversation.
+Copy the required skill source directory into your agent's skills directory, then mention any trigger keyword in conversation.
 
-> 🤖 **给 Agent 的自安装说明**：直接把仓库链接丢给 Agent，它会读根目录的 `AGENTS.md` 并自行安装这 4 个 skill。
-> 🤖 **Self-install for agents**: hand the repo link to an agent; it reads `AGENTS.md` at the repo root and installs the 4 skills itself.
+> 🤖 **给 Agent 的安装说明**：把仓库链接发给 Agent，并明确要求安装；Agent 会按根目录的 `AGENTS.md` 安装这 4 个 skill。
+> 🤖 **Installation instructions for agents**: send the repository link and explicitly ask the agent to install the skills. The agent will follow `AGENTS.md` at the repository root.
 
 ---
 

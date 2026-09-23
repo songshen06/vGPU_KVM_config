@@ -1,6 +1,9 @@
 .DS_Store
+__pycache__/
+*.py[cod]
 16.0/
 19.0/
 20.0/
 dls/
 license-system-3.6.1/
+*.skill

@@ -50,6 +50,8 @@ Note: If multiple GPUs installed, omit `--auto` and select manually. See display
 
 ### P0.3 OS Preparation (RHEL 9.x example)
 
+> **Security reminder:** Dedicated KVM hosts are often deployed with SELinux and firewalld disabled, as shown below. This reduces host security controls. Confirm that this matches the site's security baseline and that equivalent network isolation or upstream firewalling is in place before applying these commands.
+
 ```bash
 # Disable SELinux
 setenforce 0

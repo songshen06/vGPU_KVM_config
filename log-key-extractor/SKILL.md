@@ -20,6 +20,16 @@ Three tools in one skill:
 Use when the user asks to summarize very large logs, keep only key failure signals, or build compact LLM input payloads.
 For NVIDIA bug-report scenarios, also use it to extract host hardware/OS summary and focus-object evidence windows.
 
+### Workflow
+
+For generic logs, run the extractor directly. For an NVIDIA vGPU bug report, run Tool 2 (`vgpu_report.py`, below) first to identify suspect GPU BDFs, mdev UUIDs, and VMs, then run this extractor on the same raw log with those values as `--focus-object`. Do not use `vgpu_report.json` as the extractor's log input.
+
+1. Run the extractor script on the raw log.
+2. Check `llm_context.md` for quick quality validation.
+3. If output is too noisy, increase `--min-score` or reduce `--top-events`.
+4. If evidence is too thin, increase `--context-lines`.
+5. Feed `llm_context.json`, `event_windows.json`, and the companion `vgpu_report.json` to the LLM.
+
 ### Command
 
 ```bash
@@ -126,4 +136,12 @@ fault is in the VM/hypervisor layer, not the GPU layer. Read
 
 ## Tuning Guide
 
-Read `references/tuning.md` when you need profile-specific tuning for `log_key_extract.py`.
+Read `references/tuning.md` when you need profile-specific tuning.
+
+## Related
+
+`vgpu_report.py` is bundled here as Tool 2. The standalone `vgpu-report` skill (same analyzer plus `analyze_vgpu_bundle.py`) can still be used as a unified entry point that runs both tools on one `nvidia-bug-report.log` and emits a `bundle_manifest.json` linking the outputs:
+
+```bash
+python3 vgpu-report/scripts/analyze_vgpu_bundle.py <nvidia-bug-report.log> --out-dir nr_out/vgpu-bundle
+```
