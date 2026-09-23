@@ -11,8 +11,8 @@ from pathlib import Path
 
 
 def default_extractor_script() -> Path:
-    skills_root = Path(__file__).resolve().parents[2]
-    return skills_root / "log-key-extractor" / "scripts" / "log_key_extract.py"
+    # sibling script inside this same skill
+    return Path(__file__).resolve().with_name("log_key_extract.py")
 
 
 def add_focus(store, value, reason):

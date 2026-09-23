@@ -7,14 +7,13 @@
 
 ## 仓库里有什么 What's in this repo
 
-4 个 NVIDIA vGPU 相关 skill，以目录源码形式维护：
+3 个 NVIDIA vGPU 相关 skill，以目录源码形式维护：
 
 | Skill | 用途 Purpose | 触发关键词 Trigger keywords |
 |---|---|---|
 | `vgpu-kvm-config` | vGPU 创建/管理：BIOS→驱动→SR-IOV→MIG→vGPU→VM 挂载 | 配 vGPU / MIG vGPU / RTX PRO 6000 vGPU / nvidia-smi vgpu |
 | `license-system-deploy` | NVIDIA License System 部署：DLS→注册→绑定→客户端授权 | 部署 DLS / license server / 授权服务器 |
-| `log-key-extractor` | 大日志压缩成 LLM 上下文（模板聚合 + 打分事件 + host 画像） | 日志太大 / 提取关键日志 / 日志摘要 |
-| `vgpu-report` | nvidia-bug-report 结构化分析（Xid 计数、崩溃循环、pin 失败、风险分级） | 分析 vGPU 日志 / Xid 分析 / bug report 分析 |
+| `log-key-extractor` | vGPU 日志一站式排障：4 工具（LLM 上下文提取 / vGPU 结构化诊断 / 内嵌轮转日志还原 / 统一入口）+ 多源联合分析方法论 | 日志太大 / 提取关键日志 / 分析 vGPU 日志 / Xid 分析 / bug report 分析 / ENODEV / migrate-incoming / 热迁移取证 |
 
 ---
 
@@ -44,7 +43,7 @@ echo "skills dir: $SKILLS_DIR"
 复制所需的 skill 目录。每个目录包含 `SKILL.md` 及其脚本和参考资料：
 
 ```bash
-for s in vgpu-kvm-config license-system-deploy log-key-extractor vgpu-report; do
+for s in vgpu-kvm-config license-system-deploy log-key-extractor; do
   cp -R "/tmp/vgpu-kvm-config/$s" "$SKILLS_DIR/"
 done
 ```
@@ -52,7 +51,7 @@ done
 ### Step 4 — 验证
 
 ```bash
-ls "$SKILLS_DIR" | grep -E 'vgpu-kvm-config|license-system-deploy|log-key-extractor|vgpu-report'
+ls "$SKILLS_DIR" | grep -E 'vgpu-kvm-config|license-system-deploy|log-key-extractor'
 # 每个目录里都必须有 SKILL.md（含 YAML frontmatter 的 name + description）
 ```
 

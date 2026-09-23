@@ -76,31 +76,30 @@
 | **vgpu-kvm-config** | vGPU 创建与管理：BIOS → 驱动 → SR-IOV → MIG → vGPU → VM 挂载 | `vgpu-kvm-config/` |
 | **license-system-deploy** | NVIDIA License System 部署：DLS/CLS → 注册 → 绑定 → License 安装 → 客户端配置 | `license-system-deploy/` |
 | **log-key-extractor** | 大日志压缩 + vGPU 联合分析：LLM 上下文提取、bug-report 内嵌日志还原、迁移/ENODEV 故障取证 | `log-key-extractor/` |
-| **vgpu-report** | NVIDIA vGPU bug-report 分析：Xid 计数、崩溃循环、pin 失败、风险分级 | `vgpu-report/` |
 
 两者互补：`vgpu-kvm-config` 把 GPU 切成 vGPU 分给 VM，`license-system-deploy` 部署 License 服务器让 VM 里的 GPU 驱动能拿到授权。
 
 These two skills complement each other: `vgpu-kvm-config` partitions GPUs into vGPUs and assigns them to VMs; `license-system-deploy` sets up the license server so the GPU drivers inside VMs can obtain licenses.
 
-另外两个 skill 用于**排障**：`log-key-extractor`（含 3 个工具）把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文、从 bug report 二进制流中还原被 logrotate 走的轮转 libvirt 日志、并对 vGPU 迁移/ENODEV/FLR 类故障做多源联合分析；`vgpu-report` 直接产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）。
+另一个 skill 用于**排障**：`log-key-extractor`（含 4 个工具）把超大 nvidia-bug-report 日志压缩成 LLM 可读的上下文、产出结构化诊断报告（Xid 计数、崩溃循环、风险分级）、从 bug report 二进制流中还原被 logrotate 走的轮转 libvirt 日志、并对 vGPU 迁移/ENODEV/FLR 类故障做多源联合分析。
 
-The other two skills are for **troubleshooting**: `log-key-extractor` (3 tools) shrinks huge nvidia-bug-report logs into LLM-readable context, recovers logrotated libvirt logs embedded as raw gzip inside bug reports, and runs multi-source combined analysis for vGPU migration / ENODEV / FLR-close failures; `vgpu-report` produces a structured diagnostic report (Xid accounting, crash loops, risk level).
+The remaining skill is for **troubleshooting**: `log-key-extractor` (4 tools) shrinks huge nvidia-bug-report logs into LLM-readable context, produces structured diagnostics (Xid accounting, crash loops, risk level), recovers logrotated libvirt logs embedded as raw gzip inside bug reports, and runs multi-source combined analysis for vGPU migration / ENODEV / FLR-close failures.
 
 ### vGPU 日志联合分析 Combined vGPU Log Analysis
 
-两个工具读取同一份原始 `nvidia-bug-report.log`。`vgpu-report` 先定位高风险 GPU、mdev 和 VM，`log-key-extractor` 再围绕这些对象提取上下文证据：
+`log-key-extractor` 内部的两个工具读取同一份原始 `nvidia-bug-report.log`：`vgpu_report.py` 先定位高风险 GPU、mdev 和 VM，`log_key_extract.py` 再围绕这些对象提取上下文证据：
 
 ```text
 nvidia-bug-report.log
-  ├── vgpu-report        → inventory / Xid / crash loop / risk
+  ├── vgpu_report.py     → inventory / Xid / crash loop / risk
   └── log-key-extractor  → focused events / context windows
-                              ↑ focus objects from vgpu-report
+                              ↑ focus objects from vgpu_report
 ```
 
 统一入口：
 
 ```bash
-python3 vgpu-report/scripts/analyze_vgpu_bundle.py nvidia-bug-report.log \
+python3 log-key-extractor/scripts/analyze_vgpu_bundle.py nvidia-bug-report.log \
   --out-dir nr_out/vgpu-bundle
 ```
 
@@ -208,6 +207,7 @@ license-system-deploy/
 | vGPU 结构化体检 | "分析这个 bug report 的 Xid/崩溃循环/pin 失败" | `vgpu_report.py`，产出风险分级 |
 | 还原内嵌轮转日志 | "bug report 里被 logrotate 走的 VM 日志能找回吗" | `extract_embedded_gz.py` 从二进制流还原 .gz |
 | vGPU 联合分析 | "VM 起不来 / 报 vfio No such device / 有人做了热迁移？" | 多源交叉取证，见 `references/combined-vgpu-analysis.md` |
+| 一键排障 | "分析这份 bug report" | `analyze_vgpu_bundle.py` 统一入口，一次跑完诊断 + 聚焦取证 |
 
 ### 触发关键词 Trigger keywords
 
@@ -221,39 +221,13 @@ log-key-extractor/
 ├── scripts/
 │   ├── log_key_extract.py        # 大日志 → LLM 上下文
 │   ├── vgpu_report.py            # vGPU 结构化分析（Xid/循环/pin/风险分级）
-│   └── extract_embedded_gz.py    # 还原 bug report 内嵌的轮转 .gz 日志
+│   ├── extract_embedded_gz.py    # 还原 bug report 内嵌的轮转 .gz 日志
+│   └── analyze_vgpu_bundle.py    # 统一入口：vgpu_report → 聚焦 log_key_extract
 ├── schemas/
 │   └── llm_context.schema.json
 └── references/
     ├── tuning.md                  # log_key_extract 调参
     └── combined-vgpu-analysis.md  # vGPU 多源联合分析方法论（迁移/ENODEV/FLR 签名、红鲱鱼、6 步流程）
-```
-
----
-
-## vgpu-report
-
-### 能做什么？ Capabilities
-
-| 场景 Scenario | 你只需说 You just say | 说明 |
-|---|---|---|
-| 分析 vGPU 故障日志 | "分析这份 nvidia-bug-report.log" | 全量 GPU/vGPU 清单 + Xid 精确计数 |
-| 风险评级 | "这台 vGPU 主机健康吗" | CRITICAL/HIGH/WARNING/INFO 规则化分级 |
-| 崩溃循环定位 | "哪个 VM 在反复重启" | 每 mdev 的 start call 计数 |
-| 内存 pin 排障 | "Failed to pin 是哪来的" | 按 mdev 聚合 pin/IOCTL 失败 |
-
-### 触发关键词 Trigger keywords
-
-> vGPU 日志分析 / nvidia-bug-report / Xid 分析 / vGPU 崩溃循环 / vGPU 风险评级 / vgpu report / bug report 分析 / 分析 vGPU 日志
-
-### 文件结构 File structure
-
-```
-vgpu-report/
-├── SKILL.md
-└── scripts/
-    ├── analyze_vgpu_bundle.py
-    └── vgpu_report.py
 ```
 
 ---
@@ -264,7 +238,7 @@ vgpu-report/
 
 Copy the required skill source directory into your agent's skills directory, then mention any trigger keyword in conversation.
 
-> 🤖 **给 Agent 的安装说明**：把仓库链接发给 Agent，并明确要求安装；Agent 会按根目录的 `AGENTS.md` 安装这 4 个 skill。
+> 🤖 **给 Agent 的安装说明**：把仓库链接发给 Agent，并明确要求安装；Agent 会按根目录的 `AGENTS.md` 安装这 3 个 skill。
 > 🤖 **Installation instructions for agents**: send the repository link and explicitly ask the agent to install the skills. The agent will follow `AGENTS.md` at the repository root.
 
 ---
